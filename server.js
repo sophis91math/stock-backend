@@ -7,15 +7,16 @@ const PORT = process.env.PORT || 3000;
 app.use(cors());
 app.use(express.json());
 
-// 매핑 테이블: 프론트엔드 심볼 -> 야후 파이낸스 심볼
+// 매핑 테이블 (요청 순서 반영: 삼성전자 -> 하이닉스 -> 삼성SDI -> 대한전선 -> 포스코인터내셔널 -> 알파벳)
 const SYMBOL_MAP = {
   '^KS11': '^KS11',       // 코스피 지수
   '^GSPC': '^GSPC',       // S&P 500 지수
   '005930': '005930.KS',  // 삼성전자
   '000660': '000660.KS',  // SK하이닉스
-  '001440': '001440.KS',  // 대한전선
   '006400': '006400.KS',  // 삼성SDI
-  '047050': '047050.KS'   // 포스코인터내셔널 (추가됨)
+  '001440': '001440.KS',  // 대한전선
+  '047050': '047050.KS',  // 포스코인터내셔널
+  'GOOGL': 'GOOGL'        // 알파벳 (구글) Class A
 };
 
 // Yahoo v8 Chart API를 통해 직접 실시간 데이터 수신
@@ -48,7 +49,7 @@ async function fetchYahooQuote(symbol) {
     price,
     change,
     changePercent,
-    currency: meta.currency || 'KRW'
+    currency: meta.currency || 'USD'
   };
 }
 
