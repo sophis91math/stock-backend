@@ -14,10 +14,11 @@ const SYMBOL_MAP = {
   '005930': '005930.KS',  // 삼성전자
   '000660': '000660.KS',  // SK하이닉스
   '001440': '001440.KS',  // 대한전선
-  '006400': '006400.KS'   // 삼성SDI
+  '006400': '006400.KS',  // 삼성SDI
+  '047050': '047050.KS'   // 포스코인터내셔널 (추가됨)
 };
 
-// Yahoo v8 Chart API를 통해 직접 실시간 데이터 수신 (인증 쿠키/Crumb 이슈 회피)
+// Yahoo v8 Chart API를 통해 직접 실시간 데이터 수신
 async function fetchYahooQuote(symbol) {
   const url = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(symbol)}?interval=1m&range=1d`;
   
