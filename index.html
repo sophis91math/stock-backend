@@ -65,7 +65,7 @@
         <h1 class="text-xl font-extrabold tracking-tight text-white flex items-center gap-2">
           <i class="fas fa-chart-line text-indigo-400"></i> 마켓 인사이트
         </h1>
-        <p class="text-xs text-slate-400">KOSPI · S&P500 · 삼성전자 · SK하이닉스 · 대한전선 · 삼성SDI</p>
+        <p class="text-[11px] text-slate-400 truncate max-w-[260px]">KOSPI · S&P500 · 삼성전자 · SK하이닉스 · 삼성SDI 등</p>
       </div>
       <button id="refresh-btn" onclick="triggerManualRefresh()" class="w-9 h-9 rounded-full bg-slate-800 hover:bg-slate-700 text-indigo-400 flex items-center justify-center transition active:scale-95 border border-slate-700">
         <i class="fas fa-sync-alt" id="refresh-icon"></i>
@@ -143,7 +143,7 @@
           </button>
         </div>
         <p id="ai-analysis-text" class="text-xs text-slate-300 leading-relaxed bg-slate-950/40 p-3 rounded-xl border border-indigo-900/30">
-          "분석 실행" 버튼을 누르시면 Gemini AI가 현재 코스피, S&P500 및 주요 반도체주의 동향을 진단해 드립니다.
+          "분석 실행" 버튼을 누르시면 Gemini AI가 주요 종목 동향을 진단해 드립니다.
         </p>
       </div>
 
@@ -207,6 +207,7 @@
       useRealApi: true
     };
 
+    // 종목 배치 순서: 지수(KOSPI, SP500) -> 삼성전자 -> SK하이닉스 -> 삼성SDI -> 대한전선 -> 포스코인터내셔널 -> 알파벳
     const stocks = {
       KOSPI: {
         id: 'KOSPI',
@@ -260,6 +261,19 @@
         color: 'purple',
         history: [174000, 175000, 174500, 176000, 177000, 177500, 178200]
       },
+      SDI: {
+        id: 'SDI',
+        name: '삼성SDI',
+        symbol: '006400',
+        price: 385000,
+        change: -4500,
+        changePercent: -1.16,
+        isIndex: false,
+        unit: '원',
+        icon: 'S',
+        color: 'teal',
+        history: [392000, 390000, 388000, 389000, 386000, 384000, 385000]
+      },
       TAIHAN: {
         id: 'TAIHAN',
         name: '대한전선',
@@ -273,18 +287,32 @@
         color: 'amber',
         history: [13800, 13900, 14000, 14100, 14050, 14150, 14250]
       },
-      SDI: {
-        id: 'SDI',
-        name: '삼성SDI',
-        symbol: '006400',
-        price: 385000,
-        change: -4500,
-        changePercent: -1.16,
+      POSCOINT: {
+        id: 'POSCOINT',
+        name: '포스코인터내셔널',
+        symbol: '047050',
+        price: 54500,
+        change: 1200,
+        changePercent: 2.25,
         isIndex: false,
         unit: '원',
-        icon: 'S',
-        color: 'teal',
-        history: [392000, 390000, 388000, 389000, 386000, 384000, 385000]
+        icon: 'P',
+        color: 'sky',
+        history: [53000, 53200, 53500, 53800, 54000, 54200, 54500]
+      },
+      GOOGL: {
+        id: 'GOOGL',
+        name: '알파벳 A (구글)',
+        symbol: 'GOOGL',
+        price: 178.50,
+        change: 2.10,
+        changePercent: 1.19,
+        isIndex: false,
+        isUsStock: true,
+        unit: '$',
+        icon: 'G',
+        color: 'rose',
+        history: [175.0, 176.2, 175.8, 177.0, 177.5, 178.0, 178.50]
       }
     };
 
@@ -294,7 +322,7 @@
     let simulationTimer = null;
 
     function formatPrice(stock) {
-      if (stock.isIndex) {
+      if (stock.isIndex || stock.isUsStock || stock.unit === '$') {
         return stock.price.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2});
       }
       return Math.round(stock.price).toLocaleString();
@@ -336,7 +364,9 @@
               callbacks: {
                 label: function(context) {
                   const val = context.raw;
-                  return stock.isIndex ? `${val.toLocaleString()} pt` : `${Math.round(val).toLocaleString()} 원`;
+                  if (stock.isIndex) return `${val.toLocaleString()} pt`;
+                  if (stock.unit === '$') return `$${val.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}`;
+                  return `${Math.round(val).toLocaleString()} 원`;
                 }
               }
             }
@@ -381,11 +411,11 @@
             <span class="text-[10px] text-slate-500 font-mono">${stock.symbol}</span>
           </div>
           <div class="text-base font-extrabold text-white tracking-tight mb-1">
-            ${priceStr} <span class="text-[10px] font-normal text-slate-400">${stock.unit}</span>
+            ${stock.unit === '$' ? '$' + priceStr : priceStr + ' <span class="text-[10px] font-normal text-slate-400">' + stock.unit + '</span>'}
           </div>
           <div class="text-xs font-bold ${colorClass} flex items-center space-x-1">
             <i class="fas ${isUp ? 'fa-caret-up' : 'fa-caret-down'}"></i>
-            <span>${sign}${stock.change.toFixed(stock.isIndex ? 2 : 0)} (${sign}${stock.changePercent.toFixed(2)}%)</span>
+            <span>${sign}${stock.change.toFixed(stock.isIndex || stock.isUsStock ? 2 : 0)} (${sign}${stock.changePercent.toFixed(2)}%)</span>
           </div>
         `;
         container.appendChild(card);
@@ -416,7 +446,7 @@
             </div>
           </div>
           <div class="text-right">
-            <div class="text-xs font-extrabold text-slate-100">${priceStr} ${stock.unit}</div>
+            <div class="text-xs font-extrabold text-slate-100">${stock.unit === '$' ? '$' + priceStr : priceStr + ' ' + stock.unit}</div>
             <div class="text-[11px] font-bold ${colorClass}">
               ${sign}${stock.changePercent.toFixed(2)}%
             </div>
@@ -437,7 +467,7 @@
       
       const subEl = document.getElementById('chart-price-sub');
       subEl.className = `text-xs font-semibold ${isUp ? 'text-rose-400' : 'text-blue-400'}`;
-      subEl.innerText = `${priceStr} ${stock.unit} (${sign}${stock.changePercent.toFixed(2)}%)`;
+      subEl.innerText = `${stock.unit === '$' ? '$' + priceStr : priceStr + ' ' + stock.unit} (${sign}${stock.changePercent.toFixed(2)}%)`;
 
       const iconEl = document.getElementById('selected-stock-icon');
       iconEl.innerText = stock.icon;
@@ -504,7 +534,7 @@
             const subEl = document.getElementById('chart-price-sub');
             if (subEl) {
               subEl.className = `text-xs font-semibold ${isUp ? 'text-rose-400' : 'text-blue-400'}`;
-              subEl.innerText = `${priceStr} ${currentSelected.unit} (${sign}${currentSelected.changePercent.toFixed(2)}%)`;
+              subEl.innerText = `${currentSelected.unit === '$' ? '$' + priceStr : priceStr + ' ' + currentSelected.unit} (${sign}${currentSelected.changePercent.toFixed(2)}%)`;
             }
           }
 
@@ -576,18 +606,14 @@
 
       btn.disabled = true;
       btn.innerHTML = `<i class="fas fa-spinner fa-spin text-[10px]"></i><span>분석 중...</span>`;
-      textEl.innerText = "Gemini AI가 실시간 주요 지수 및 반도체/전선/2차전지 주가의 수급 동향을 요약 분석 중입니다...";
+      textEl.innerText = "Gemini AI가 실시간 주요 지수 및 삼성전자, 하이닉스, 알파벳 등 주요 주가의 수급 동향을 요약 분석 중입니다...";
 
       try {
-        const prompt = `현재 지수 및 주가 정보:
-1. 코스피: ${stocks.KOSPI.price.toFixed(2)} (${stocks.KOSPI.changePercent.toFixed(2)}%)
-2. S&P500: ${stocks.SP500.price.toFixed(2)} (${stocks.SP500.changePercent.toFixed(2)}%)
-3. 삼성전자: ${Math.round(stocks.SAMSUNG.price).toLocaleString()}원 (${stocks.SAMSUNG.changePercent.toFixed(2)}%)
-4. SK하이닉스: ${Math.round(stocks.HYNIX.price).toLocaleString()}원 (${stocks.HYNIX.changePercent.toFixed(2)}%)
-5. 대한전선: ${Math.round(stocks.TAIHAN.price).toLocaleString()}원 (${stocks.TAIHAN.changePercent.toFixed(2)}%)
-6. 삼성SDI: ${Math.round(stocks.SDI.price).toLocaleString()}원 (${stocks.SDI.changePercent.toFixed(2)}%)
+        const stockSummaries = Object.values(stocks)
+          .map(s => `${s.name}: ${s.unit === '$' ? '$' : ''}${formatPrice(s)}${s.unit !== '$' ? s.unit : ''} (${s.changePercent >= 0 ? '+' : ''}${s.changePercent.toFixed(2)}%)`)
+          .join('\n');
 
-위 증시 상황을 토대로 개인 투자자가 알기 쉽게 3문장 이내로 명확하게 브리핑해줘. 긍정적이고 모바일 앱 요약에 어울리는 한국어로 작성해줘.`;
+        const prompt = `현재 지수 및 주요 주가 정보:\n${stockSummaries}\n\n위 증시 상황을 토대로 개인 투자자가 알기 쉽게 3문장 이내로 명확하게 브리핑해줘. 긍정적이고 모바일 앱 요약에 어울리는 한국어로 작성해줘.`;
 
         const apiKey = ""; 
         const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3-flash-preview:generateContent?key=${apiKey}`;
@@ -606,11 +632,11 @@
         if (aiResponseText) {
           textEl.innerText = aiResponseText;
         } else {
-          textEl.innerText = "💡 [시황 브리핑] 반도체 대장주의 견조한 흐름 속에 코스피와 S&P500 지수가 안정적 흐름을 보이고 있습니다. 개별 종목 수급 동향을 지속적으로 체크하시길 바랍니다.";
+          textEl.innerText = "💡 [시황 브리핑] 삼성전자 및 SK하이닉스 등 주요 대장주의 견조한 흐름 속에 지수가 안정적인 추세를 나타내고 있습니다.";
         }
       } catch (err) {
         console.error("AI Analysis Fetch Error:", err);
-        textEl.innerText = "💡 [시황 브리핑] 반도체 및 지수가 안정적인 추세를 유지 중입니다. 실시간 변동을 모니터링하여 대응 전략을 수립하세요.";
+        textEl.innerText = "💡 [시황 브리핑] 주요 종목들이 안정적인 추세를 유지 중입니다. 실시간 변동을 모니터링하여 대응 전략을 수립하세요.";
       } finally {
         btn.disabled = false;
         btn.innerHTML = `<i class="fas fa-magic text-[10px]"></i><span>분석 실행</span>`;
