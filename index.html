@@ -16,8 +16,8 @@
       theme: {
         extend: {
           colors: {
-            up: '#f87171',   <!-- 상승 (상한가/상승: 한국 증시 빨간색) -->
-            down: '#60a5fa', <!-- 하락 (파란색) -->
+            up: '#f87171',   
+            down: '#60a5fa', 
             cardBg: '#1e293b',
           }
         }
@@ -25,7 +25,6 @@
     }
   </script>
   <style>
-    /* Custom scrollbar & tap highlight styling for smooth mobile touch */
     ::-webkit-scrollbar { width: 4px; height: 4px; }
     ::-webkit-scrollbar-thumb { background: #475569; border-radius: 9999px; }
     * { -webkit-tap-highlight-color: transparent; }
@@ -52,7 +51,7 @@
       <div class="flex items-center space-x-2">
         <span id="current-time" class="font-bold text-slate-200">12:00</span>
         <span class="inline-block w-2 h-2 rounded-full bg-emerald-500 animate-ping"></span>
-        <span class="text-[10px] text-emerald-400 font-semibold uppercase">LIVE</span>
+        <span class="text-[10px] text-emerald-400 font-semibold uppercase" id="api-status-badge">LIVE</span>
       </div>
       <div class="flex items-center space-x-3 text-slate-400">
         <i class="fas fa-wifi"></i>
@@ -123,7 +122,7 @@
       <div class="bg-slate-900 border border-slate-800 rounded-2xl p-4 space-y-3">
         <div class="flex justify-between items-center pb-2 border-b border-slate-800">
           <h3 class="text-xs font-bold text-slate-300 uppercase tracking-wider">주요 종목 상세 현황</h3>
-          <span class="text-[10px] text-slate-500">2초마다 실시간 갱신 중</span>
+          <span class="text-[10px] text-slate-500" id="update-timer-text">실시간 갱신 중</span>
         </div>
 
         <div class="divide-y divide-slate-800/60" id="stock-list-details">
@@ -172,7 +171,7 @@
 
   </div>
 
-  <!-- Settings Modal (Hidden by default) -->
+  <!-- Settings Modal -->
   <div id="settings-modal" class="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
     <div class="bg-slate-900 border border-slate-800 w-full max-w-sm rounded-2xl p-5 space-y-4 text-slate-200">
       <div class="flex justify-between items-center border-b border-slate-800 pb-2">
@@ -185,15 +184,14 @@
         <div>
           <label class="block text-slate-400 mb-1 font-semibold">실시간 업데이트 주기 (초)</label>
           <select id="update-interval" onchange="changeInterval(this.value)" class="w-full bg-slate-950 border border-slate-800 rounded-lg p-2 text-white outline-none">
-            <option value="1000">1초 (빠른 시뮬레이션)</option>
-            <option value="2000" selected>2초 (기본)</option>
-            <option value="5000">5초</option>
+            <option value="3000">3초</option>
+            <option value="5000" selected>5초 (권장)</option>
+            <option value="10000">10초</option>
           </select>
         </div>
         <div class="bg-slate-950 p-3 rounded-xl border border-slate-800 space-y-1 text-slate-400">
-          <p class="font-bold text-indigo-400">💡 실제 증시 API 연결 안내</p>
-          <p>현재 앱은 **실시간 변동 시뮬레이터**로 동작하고 있습니다.</p>
-          <p class="pt-1">실제 상용화 시 **한국투자증권 Open API** 또는 **Yahoo Finance API**를 웹서버에 연결하여 실시간 데이터를 수신할 수 있습니다.</p>
+          <p class="font-bold text-indigo-400">💡 연결된 API 엔드포인트</p>
+          <p class="font-mono text-[10px] break-all text-slate-300" id="api-url-display"></p>
         </div>
       </div>
       <button onclick="toggleSimulationModal()" class="w-full py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white font-bold rounded-xl text-xs">닫기</button>
@@ -204,13 +202,10 @@
     // -------------------------------------------------------------
     // 1. Initial Stock Data State & API Configuration
     // -------------------------------------------------------------
-    // 💡 실제 API를 연동할 앤드포인트 URL 및 설정을 여기에 입력하세요!
-          // 예: 자체 백엔드 서버 또는 CORS 허용 증권 API 앤드포인트 https://stock-backend-q86h.onrender.com
-const API_CONFIG = {
-     endpointUrl: 'https://stock-backend-q86h.onrender.com/api/stocks/realtime',
-       useRealApi: true // <-- true로 설정
-   };
-    
+    const API_CONFIG = {
+      endpointUrl: 'https://stock-backend-q86h.onrender.com/api/stocks/realtime',
+      useRealApi: true
+    };
 
     const stocks = {
       KOSPI: {
@@ -295,12 +290,19 @@ const API_CONFIG = {
 
     let selectedStockId = 'KOSPI';
     let stockChart = null;
-    let updateIntervalMs = 2000;
+    let updateIntervalMs = 5000;
     let simulationTimer = null;
+
+    function formatPrice(stock) {
+      if (stock.isIndex) {
+        return stock.price.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2});
+      }
+      // 한국 원화 주가는 소수점 제거 (정수 표기)
+      return Math.round(stock.price).toLocaleString();
+    }
 
     function initChart() {
       const ctx = document.getElementById('stockChart').getContext('2d');
-      
       const stock = stocks[selectedStockId];
       const isUp = stock.change >= 0;
       const lineColor = isUp ? '#f87171' : '#60a5fa';
@@ -335,7 +337,7 @@ const API_CONFIG = {
               callbacks: {
                 label: function(context) {
                   const val = context.raw;
-                  return stock.isIndex ? `${val.toLocaleString()} pt` : `${val.toLocaleString()} 원`;
+                  return stock.isIndex ? `${val.toLocaleString()} pt` : `${Math.round(val).toLocaleString()} 원`;
                 }
               }
             }
@@ -363,7 +365,7 @@ const API_CONFIG = {
         const isUp = stock.change >= 0;
         const colorClass = isUp ? 'text-rose-400' : 'text-blue-400';
         const sign = isUp ? '+' : '';
-        const priceStr = stock.isIndex ? stock.price.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2}) : stock.price.toLocaleString();
+        const priceStr = formatPrice(stock);
 
         const card = document.createElement('div');
         card.id = `card-${stock.id}`;
@@ -399,7 +401,7 @@ const API_CONFIG = {
         const isUp = stock.change >= 0;
         const colorClass = isUp ? 'text-rose-400' : 'text-blue-400';
         const sign = isUp ? '+' : '';
-        const priceStr = stock.isIndex ? stock.price.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2}) : stock.price.toLocaleString();
+        const priceStr = formatPrice(stock);
 
         const row = document.createElement('div');
         row.className = 'py-2.5 flex items-center justify-between cursor-pointer hover:bg-slate-800/40 rounded-lg px-2 transition';
@@ -432,7 +434,7 @@ const API_CONFIG = {
       document.getElementById('chart-title').innerText = stock.name;
       const isUp = stock.change >= 0;
       const sign = isUp ? '+' : '';
-      const priceStr = stock.isIndex ? stock.price.toFixed(2) : stock.price.toLocaleString();
+      const priceStr = formatPrice(stock);
       
       const subEl = document.getElementById('chart-price-sub');
       subEl.className = `text-xs font-semibold ${isUp ? 'text-rose-400' : 'text-blue-400'}`;
@@ -459,82 +461,14 @@ const API_CONFIG = {
       stockChart.update();
     }
 
-    function simulateMarketTicks() {
-      Object.keys(stocks).forEach(key => {
-        const stock = stocks[key];
-        
-        // Random price fluctuation percentage (-0.4% ~ +0.4%)
-        const deltaPercent = (Math.random() - 0.49) * 0.008;
-        const deltaPrice = stock.price * deltaPercent;
-        
-        stock.price += deltaPrice;
-        stock.change += deltaPrice;
-        stock.changePercent = (stock.change / (stock.price - stock.change)) * 100;
-
-        // Keep last history array updated
-        stock.history[stock.history.length - 1] = parseFloat(stock.price.toFixed(2));
-
-        // Visual flash effect
-        const cardEl = document.getElementById(`card-${stock.id}`);
-        if (cardEl) {
-          cardEl.classList.remove('flash-up', 'flash-down');
-          void cardEl.offsetWidth; // Trigger reflow
-          cardEl.classList.add(deltaPrice >= 0 ? 'flash-up' : 'flash-down');
-        }
-      });
-
-      renderStockCards();
-      renderStockDetailsList();
-      if (stockChart) {
-        updateChartData();
-      }
-    }
-
-    function startSimulation() {
-      if (simulationTimer) clearInterval(simulationTimer);
-      
-      // API_CONFIG.useRealApi 설정값에 따라 시뮬레이션 또는 실제 API 연동
-      if (API_CONFIG.useRealApi) {
-        fetchRealStockData(); // 최초 1회 즉시 실행
-        simulationTimer = setInterval(fetchRealStockData, updateIntervalMs);
-      } else {
-        simulationTimer = setInterval(simulateMarketTicks, updateIntervalMs);
-      }
-    }
-
-    // 💡 실제 API 앤드포인트에서 주가 데이터를 수신하는 함수
     async function fetchRealStockData() {
-      if (!API_CONFIG.endpointUrl || API_CONFIG.endpointUrl.includes('your-backend-api-domain')) {
-        console.warn('실제 API URL이 설정되지 않았습니다. API_CONFIG.endpointUrl을 확인하세요.');
-        return;
-      }
-
+      const badge = document.getElementById('api-status-badge');
       try {
-        const response = await fetch(API_CONFIG.endpointUrl, {
-          method: 'GET',
-          headers: {
-            'Content-Type': 'application/json',
-            // 필요 시 인증 토큰 추가
-            // 'Authorization': 'Bearer YOUR_ACCESS_TOKEN'
-          }
-        });
-
+        const response = await fetch(API_CONFIG.endpointUrl);
         if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
         
         const data = await response.json();
-        /* 
-           [백엔드 API 응답 데이터 예시]
-           {
-             "^KS11": { price: 2685.40, change: 12.30, changePercent: 0.46 },
-             "^GSPC": { price: 5648.20, change: 24.15, changePercent: 0.43 },
-             "005930": { price: 76500, change: -400, changePercent: -0.52 },
-             "000660": { price: 178200, change: 3100, changePercent: 1.77 },
-             "001440": { price: 14250, change: 350, changePercent: 2.52 },
-             "006400": { price: 385000, change: -4500, changePercent: -1.16 }
-           }
-        */
 
-        // 수신된 API 데이터로 stocks 객체 업데이트
         Object.keys(stocks).forEach(key => {
           const stock = stocks[key];
           const apiData = data[stock.symbol];
@@ -544,19 +478,38 @@ const API_CONFIG = {
             stock.change = apiData.change;
             stock.changePercent = apiData.changePercent;
             
-            // 히스토리 배열 업데이트
             stock.history.shift();
             stock.history.push(apiData.price);
+
+            const cardEl = document.getElementById(`card-${stock.id}`);
+            if (cardEl) {
+              cardEl.classList.remove('flash-up', 'flash-down');
+              void cardEl.offsetWidth;
+              cardEl.classList.add(apiData.change >= 0 ? 'flash-up' : 'flash-down');
+            }
           }
         });
 
-        // 화면 갱신
+        badge.innerText = "REAL API";
+        badge.className = "text-[10px] text-emerald-400 font-semibold uppercase";
+
         renderStockCards();
         renderStockDetailsList();
         if (stockChart) updateChartData();
 
       } catch (error) {
-        console.error("실시간 주가 데이터 수신 실패:", error);
+        console.error("실시간 주가 수신 대기 중 (서버 응답 없음):", error);
+        badge.innerText = "CONNECTING...";
+        badge.className = "text-[10px] text-amber-400 font-semibold uppercase animate-pulse";
+      }
+    }
+
+    function startSimulation() {
+      if (simulationTimer) clearInterval(simulationTimer);
+      
+      if (API_CONFIG.useRealApi) {
+        fetchRealStockData();
+        simulationTimer = setInterval(fetchRealStockData, updateIntervalMs);
       }
     }
 
@@ -568,7 +521,9 @@ const API_CONFIG = {
     function triggerManualRefresh() {
       const icon = document.getElementById('refresh-icon');
       icon.classList.add('fa-spin');
-      simulateMarketTicks();
+      if (API_CONFIG.useRealApi) {
+        fetchRealStockData();
+      }
       setTimeout(() => icon.classList.remove('fa-spin'), 600);
     }
 
@@ -580,7 +535,6 @@ const API_CONFIG = {
           btn.className = "tf-btn px-2 py-0.5 rounded hover:text-white";
         }
       });
-      // Generate realistic dynamic trend points based on selected timeframe
       const stock = stocks[selectedStockId];
       const base = stock.price;
       const count = 7;
@@ -609,14 +563,14 @@ const API_CONFIG = {
         const prompt = `현재 지수 및 주가 정보:
 1. 코스피: ${stocks.KOSPI.price.toFixed(2)} (${stocks.KOSPI.changePercent.toFixed(2)}%)
 2. S&P500: ${stocks.SP500.price.toFixed(2)} (${stocks.SP500.changePercent.toFixed(2)}%)
-3. 삼성전자: ${stocks.SAMSUNG.price.toLocaleString()}원 (${stocks.SAMSUNG.changePercent.toFixed(2)}%)
-4. SK하이닉스: ${stocks.HYNIX.price.toLocaleString()}원 (${stocks.HYNIX.changePercent.toFixed(2)}%)
-5. 대한전선: ${stocks.TAIHAN.price.toLocaleString()}원 (${stocks.TAIHAN.changePercent.toFixed(2)}%)
-6. 삼성SDI: ${stocks.SDI.price.toLocaleString()}원 (${stocks.SDI.changePercent.toFixed(2)}%)
+3. 삼성전자: ${Math.round(stocks.SAMSUNG.price).toLocaleString()}원 (${stocks.SAMSUNG.changePercent.toFixed(2)}%)
+4. SK하이닉스: ${Math.round(stocks.HYNIX.price).toLocaleString()}원 (${stocks.HYNIX.changePercent.toFixed(2)}%)
+5. 대한전선: ${Math.round(stocks.TAIHAN.price).toLocaleString()}원 (${stocks.TAIHAN.changePercent.toFixed(2)}%)
+6. 삼성SDI: ${Math.round(stocks.SDI.price).toLocaleString()}원 (${stocks.SDI.changePercent.toFixed(2)}%)
 
 위 증시 상황을 토대로 개인 투자자가 알기 쉽게 3문장 이내로 명확하게 브리핑해줘. 긍정적이고 모바일 앱 요약에 어울리는 한국어로 작성해줘.`;
 
-        const apiKey = ""; // Canvas runtime provides empty key automatically
+        const apiKey = ""; 
         const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3-flash-preview:generateContent?key=${apiKey}`;
 
         const response = await fetch(apiUrl, {
@@ -652,6 +606,7 @@ const API_CONFIG = {
     }
 
     window.onload = function() {
+      document.getElementById('api-url-display').innerText = API_CONFIG.endpointUrl;
       updateClock();
       setInterval(updateClock, 10000);
       renderStockCards();
